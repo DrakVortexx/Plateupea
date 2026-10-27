@@ -14,15 +14,23 @@
 
     <!-- Login Screen -->
     <div id="login-screen" class="screen">
+        <div class="login-bg">
+            <div class="login-particles"></div>
+        </div>
         <div class="login-container">
-            <h1>Platopia</h1>
-            <p>Open World MMO</p>
-            <input type="text" id="username" placeholder="Username" maxlength="50">
-            <input type="email" id="email" placeholder="Email">
-            <input type="password" id="password" placeholder="Password">
-            <button id="login-btn">Login</button>
-            <button id="register-btn">Register</button>
-            <p id="login-error" class="error"></p>
+            <div class="login-logo">
+                <h1 class="logo-text">PLATOPIA</h1>
+                <div class="logo-subtitle">Open World MMO</div>
+            </div>
+            <div class="login-form">
+                <input type="text" id="username" class="login-input" placeholder="Username" maxlength="50" autocomplete="username">
+                <input type="password" id="password" class="login-input" placeholder="Password" autocomplete="current-password">
+                <div class="login-buttons">
+                    <button id="login-btn" class="login-btn login-btn-primary">Login</button>
+                    <button id="register-btn" class="login-btn">Create Account</button>
+                </div>
+                <p id="login-error" class="error"></p>
+            </div>
         </div>
     </div>
 

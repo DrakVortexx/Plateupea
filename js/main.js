@@ -16,15 +16,40 @@ function setupLoginHandlers() {
 
     loginBtn.addEventListener('click', handleLogin);
     registerBtn.addEventListener('click', handleRegister);
+
+    // Allow Enter key to login
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleLogin();
+        }
+    });
+    
+    usernameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('password').focus();
+        }
+    });
 }
 
 async function handleLogin() {
-    const username = document.getElementById('username').value;
-    const email = document.getElementById('email').value;
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
-    if (!username || !email || !password) {
-        showError('Please fill in all fields');
+    if (!username || !password) {
+        showError('Please enter username and password');
+        return;
+    }
+
+    if (username.length < 3) {
+        showError('Username must be at least 3 characters');
+        return;
+    }
+
+    if (password.length < 4) {
+        showError('Password must be at least 4 characters');
         return;
     }
 
@@ -33,12 +58,21 @@ async function handleLogin() {
 }
 
 async function handleRegister() {
-    const username = document.getElementById('username').value;
-    const email = document.getElementById('email').value;
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
-    if (!username || !email || !password) {
-        showError('Please fill in all fields');
+    if (!username || !password) {
+        showError('Please enter username and password');
+        return;
+    }
+
+    if (username.length < 3) {
+        showError('Username must be at least 3 characters');
+        return;
+    }
+
+    if (password.length < 4) {
+        showError('Password must be at least 4 characters');
         return;
     }
 
@@ -50,8 +84,7 @@ function mockLogin(username) {
     // Create mock player
     GameState.player = {
         id: 'mock-player-id',
-        username: username,
-        email: document.getElementById('email').value
+        username: username
     };
 
     // Create mock character
@@ -97,6 +130,10 @@ function mockLogin(username) {
 function showError(message) {
     const errorEl = document.getElementById('login-error');
     errorEl.textContent = message;
+    errorEl.style.animation = 'none';
+    setTimeout(() => {
+        errorEl.style.animation = 'shake 0.5s ease-in-out';
+    }, 10);
 }
 
 function startPhaser() {
