@@ -134,7 +134,8 @@ function updateHUD() {
     const hp = GameState.character.hp || 150;
     const maxHp = GameState.character.max_hp || 150;
     document.getElementById('health-text').textContent = `${Math.floor(hp)}/${maxHp}`;
-    document.getElementById('health-fill').style.width = `${Math.max(0, (hp / maxHp) * 100)}%`;
+    const healthFill = document.getElementById('health-fill');
+    if (healthFill) healthFill.style.width = `${Math.max(0, (hp / maxHp) * 100)}%`;
     document.getElementById('money-display').textContent = GameState.character.money || 0;
 
     const level = GameState.character.level || 1;
@@ -142,7 +143,8 @@ function updateHUD() {
     const currentXp = GameState.character.experience || 0;
     const xpProgress = (currentXp / xpForLevel) * 100;
     document.getElementById('xp-text').textContent = `${currentXp}/${xpForLevel} XP`;
-    document.getElementById('xp-fill').style.width = `${Math.min(100, xpProgress)}%`;
+    const xpFill = document.getElementById('xp-fill');
+    if (xpFill) xpFill.style.width = `${Math.min(100, xpProgress)}%`;
 }
 
 // Get XP required for level

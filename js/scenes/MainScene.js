@@ -68,7 +68,7 @@ class MainScene extends Phaser.Scene {
         this.ground.fillRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
         
         // Add grid pattern for better visuals
-        this.ground.lineStyle(1, 0x2a5a3a, 0.3);
+        this.ground.lineStyle(1, 0x2a5a3a, 0.25);
         for (let x = 0; x < CONFIG.WORLD_WIDTH; x += 64) {
             this.ground.moveTo(x, 0);
             this.ground.lineTo(x, CONFIG.WORLD_HEIGHT);
@@ -90,21 +90,43 @@ class MainScene extends Phaser.Scene {
     }
 
     addDecorations() {
-        // Add some rocks and trees for visual
-        for (let i = 0; i < 200; i++) {
+        // Add rocks and trees for visual
+        for (let i = 0; i < 400; i++) {
             const x = Phaser.Math.Between(0, CONFIG.WORLD_WIDTH);
             const y = Phaser.Math.Between(0, CONFIG.WORLD_HEIGHT);
             // Avoid safe zone
-            if (x < 2000 && y < 2000) continue;
+            if (x > 2000 && x < 3000 && y > 2000 && y < 3000) continue;
             
-            const type = Math.random() < 0.7 ? 'tree' : 'rock';
+            const type = Math.random() < 0.65 ? 'tree' : 'rock';
             if (type === 'tree') {
-                const tree = this.add.circle(x, y, 8, 0x1a4d1a);
-                tree.setAlpha(0.8);
+                // Tree trunk
+                const trunk = this.add.rectangle(x, y + 6, 4, 12, 0x4a3728);
+                trunk.setDepth(1);
+                // Tree leaves
+                const leaves = this.add.circle(x, y - 2, 12, 0x1a5f1a);
+                leaves.setAlpha(0.9);
+                leaves.setDepth(2);
             } else {
-                const rock = this.add.circle(x, y, 4, 0x666666);
-                rock.setAlpha(0.7);
+                const rock = this.add.circle(x, y, 6, 0x555555);
+                rock.setAlpha(0.8);
+                rock.setDepth(1);
+                // Add some smaller rocks
+                if (Math.random() < 0.3) {
+                    const rock2 = this.add.circle(x + 8, y + 4, 4, 0x666666);
+                    rock2.setAlpha(0.7);
+                    rock2.setDepth(1);
+                }
             }
+        }
+        
+        // Add some grass patches
+        for (let i = 0; i < 200; i++) {
+            const x = Phaser.Math.Between(0, CONFIG.WORLD_WIDTH);
+            const y = Phaser.Math.Between(0, CONFIG.WORLD_HEIGHT);
+            if (x > 2000 && x < 3000 && y > 2000 && y < 3000) continue;
+            const grass = this.add.circle(x, y, 2, 0x2d6b2d);
+            grass.setAlpha(0.4);
+            grass.setDepth(0);
         }
     }
 
@@ -199,7 +221,8 @@ class MainScene extends Phaser.Scene {
         });
 
         // Player name with better styling
-        this.playerName = this.add.text(startX, startY - 40, GameState.character?.name || 'Player', {
+        const displayName = GameState.character?.name || GameState.player?.username || 'Player';
+        this.playerName = this.add.text(startX, startY - 40, displayName, {
             fontSize: '16px',
             color: '#00d4ff',
             fontStyle: 'bold',
