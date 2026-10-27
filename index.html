@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platopia - Open World MMO</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container"></div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="login-container">
+            <h1>Platopia</h1>
+            <p>Open World MMO</p>
+            <input type="text" id="username" placeholder="Username" maxlength="50">
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
+            <button id="login-btn">Login</button>
+            <button id="register-btn">Register</button>
+            <p id="login-error" class="error"></p>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hud hidden">
+        <div class="hud-top">
+            <div class="player-info">
+                <span id="player-name">Player</span>
+                <span id="player-level">Level 1</span>
+            </div>
+            <div class="health-bar">
+                <div class="health-fill" id="health-fill"></div>
+                <span id="health-text">100/100</span>
+            </div>
+            <div class="money-display">
+                <span>$<span id="money-display">100</span></span>
+            </div>
+        </div>
+        <div class="hud-middle">
+            <button id="inventory-btn" class="hud-btn">Inventory (I)</button>
+            <button id="map-btn" class="hud-btn">Map (M)</button>
+            <button id="bazaar-btn" class="hud-btn">Bazaar (B)</button>
+            <button id="quests-btn" class="hud-btn">Quests (Q)</button>
+            <button id="team-btn" class="hud-btn">Team (T)</button>
+            <button id="stash-btn" class="hud-btn">Stash (S)</button>
+        </div>
+        <div class="hud-bottom">
+            <div class="xp-bar">
+                <div class="xp-fill" id="xp-fill"></div>
+                <span id="xp-text">0/100 XP</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory UI -->
+    <div id="inventory-ui" class="ui-panel hidden">
+        <div class="panel-header">
+            <h2>Inventory</h2>
+            <button class="close-btn" data-panel="inventory-ui">×</button>
+        </div>
+        <div class="inventory-grid" id="inventory-grid"></div>
+        <div class="item-details" id="item-details"></div>
+    </div>
+
+    <!-- Map UI -->
+    <div id="map-ui" class="ui-panel hidden">
+        <div class="panel-header">
+            <h2>World Map</h2>
+            <button class="close-btn" data-panel="map-ui">×</button>
+        </div>
+        <div class="map-container">
+            <canvas id="map-canvas"></canvas>
+        </div>
+        <div class="map-info">
+            <p>Current Biome: <span id="current-biome">Forest</span></p>
+            <p>Position: <span id="current-position">0, 0</span></p>
+        </div>
+    </div>
+
+    <!-- Bazaar UI -->
+    <div id="bazaar-ui" class="ui-panel hidden">
+        <div class="panel-header">
+            <h2>Bazaar</h2>
+            <button class="close-btn" data-panel="bazaar-ui">×</button>
+        </div>
+        <div class="bazaar-tabs">
+            <button class="tab-btn active" data-tab="buy">Buy</button>
+            <button class="tab-btn" data-tab="sell">Sell</button>
+            <button class="tab-btn" data-tab="my-listings">My Listings</button>
+        </div>
+        <div class="bazaar-content" id="bazaar-content"></div>
+    </div>
+
+    <!-- Quests UI -->
+    <div id="quests-ui" class="ui-panel hidden">
+        <div class="panel-header">
+            <h2>Quests</h2>
+            <button class="close-btn" data-panel="quests-ui">×</button>
+        </div>
+        <div class="quest-tabs">
+            <button class="tab-btn active" data-tab="daily">Daily</button>
+            <button class="tab-btn" data-tab="weekly">Weekly</button>
+            <button class="tab-btn" data-tab="monthly">Monthly</button>
+            <button class="tab-btn" data-tab="story">Story</button>
+        </div>
+        <div class="quest-list" id="quest-list"></div>
+    </div>
+
+    <!-- Team UI -->
+    <div id="team-ui" class="ui-panel hidden">
+        <div class="panel-header">
+            <h2>Team</h2>
+            <button class="close-btn" data-panel="team-ui">×</button>
+        </div>
+        <div class="team-content" id="team-content"></div>
+    </div>
+
+    <!-- Stash UI -->
+    <div id="stash-ui" class="ui-panel hidden">
+        <div class="panel-header">
+            <h2>Stash</h2>
+            <button class="close-btn" data-panel="stash-ui">×</button>
+        </div>
+        <div class="stash-actions">
+            <button id="build-stash-btn">Build Stash ($500)</button>
+            <button id="raid-stash-btn">Raid Nearby Stash (5 min)</button>
+        </div>
+        <div class="stash-grid" id="stash-grid"></div>
+        <div class="stash-money">
+            <p>Stash Money: $<span id="stash-money">0</span></p>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification hidden"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/supabaseClient.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/scenes/MainScene.js"></script>
+    <script src="js/scenes/UIScene.js"></script>
+    <script src="js/ui/inventory.js"></script>
+    <script src="js/ui/map.js"></script>
+    <script src="js/ui/bazaar.js"></script>
+    <script src="js/ui/quests.js"></script>
+    <script src="js/ui/team.js"></script>
+    <script src="js/ui/stash.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
