@@ -62,7 +62,7 @@ function showItemDetails(item) {
 }
 
 function useItem() {
-    if (selectedSlot === null) return;
+    if (selectedSlot === null || selectedSlot === undefined) return;
 
     const item = GameState.inventory[selectedSlot];
     if (!item) return;
@@ -71,22 +71,26 @@ function useItem() {
     switch (item.type) {
         case 'consumable':
             // Apply consumable effect
-            if (item.name === 'Health Potion') {
-                GameState.character.hp = Math.min(
-                    GameState.character.hp + 50,
-                    GameState.character.max_hp
-                );
-                showNotification('Used Health Potion (+50 HP)');
-                updateHUD();
+            if (item.heal || item.name === 'Health Potion') {
+                const healAmount = item.heal || 60;
+                if (GameState.character) {
+                    GameState.character.hp = Math.min(
+                        (GameState.character.hp || 0) + healAmount,
+                        GameState.character.max_hp || 150
+                    );
+                    showNotification(`Used ${item.name} (+${healAmount} HP)`);
+                    updateHUD();
+                }
             }
             break;
         case 'weapon':
-            // Equip weapon
             showNotification(`Equipped ${item.name}`);
             break;
         case 'armor':
-            // Equip armor
             showNotification(`Equipped ${item.name}`);
+            break;
+        case 'material':
+            showNotification('Can be sold at bazaar or used for crafting');
             break;
         default:
             showNotification('Cannot use this item');
@@ -95,11 +99,13 @@ function useItem() {
 
     // Remove item if consumable
     if (item.type === 'consumable') {
-        item.quantity--;
-        if (item.quantity <= 0) {
+        if (item.quantity && item.quantity > 1) {
+            item.quantity--;
+        } else {
             GameState.inventory[selectedSlot] = null;
         }
         loadInventory();
+        showItemDetails(GameState.inventory[selectedSlot]);
     }
 }
 

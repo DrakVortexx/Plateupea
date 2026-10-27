@@ -33,28 +33,32 @@ class MainScene extends Phaser.Scene {
 
         // Setup camera with smooth follow
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-        this.cameras.main.setZoom(1.2);
+        this.cameras.main.setZoom(1.1);
         this.cameras.main.setLerp(0.1, 0.1);
 
         // Combat setup
         this.isAttacking = false;
-        this.attackCooldown = CONFIG.ATTACK_COOLDOWN;
+        this.attackCooldown = CONFIG.ATTACK_COOLDOWN || 400;
         this.lastAttackTime = 0;
         this.comboCount = 0;
         this.comboTimer = null;
 
-        // Particle effects
-        this.particles = this.add.particles('particle');
-
         // Spawn initial enemies
-        this.spawnEnemies(50);
+        this.spawnEnemies(30);
 
         // Spawn loot periodically
         this.time.addEvent({
-            delay: 30000,
+            delay: 25000,
             callback: this.spawnLoot,
             callbackScope: this,
             loop: true
+        });
+
+        // Show starting hint
+        this.time.delayedCall(500, () => {
+            if (typeof showNotification === 'function') {
+                showNotification('Chop trees with your axe! Kill enemies for XP!');
+            }
         });
 
         // Update loop
@@ -90,42 +94,56 @@ class MainScene extends Phaser.Scene {
     }
 
     addDecorations() {
-        // Add rocks and trees for visual
-        for (let i = 0; i < 400; i++) {
+        this.trees = this.physics.add.staticGroup();
+        this.rocks = this.physics.add.staticGroup();
+        
+        // Add rocks and trees for visual and interaction
+        for (let i = 0; i < 500; i++) {
             const x = Phaser.Math.Between(0, CONFIG.WORLD_WIDTH);
             const y = Phaser.Math.Between(0, CONFIG.WORLD_HEIGHT);
             // Avoid safe zone
             if (x > 2000 && x < 3000 && y > 2000 && y < 3000) continue;
             
-            const type = Math.random() < 0.65 ? 'tree' : 'rock';
+            const type = Math.random() < 0.7 ? 'tree' : 'rock';
             if (type === 'tree') {
                 // Tree trunk
-                const trunk = this.add.rectangle(x, y + 6, 4, 12, 0x4a3728);
+                const trunk = this.add.rectangle(x, y + 6, 6, 16, 0x4a3728);
                 trunk.setDepth(1);
                 // Tree leaves
-                const leaves = this.add.circle(x, y - 2, 12, 0x1a5f1a);
-                leaves.setAlpha(0.9);
+                const leaves = this.add.circle(x, y - 4, 16, 0x1a6f1a);
+                leaves.setAlpha(0.95);
                 leaves.setDepth(2);
+                
+                const tree = this.physics.add.staticSprite(x, y);
+                tree.setVisible(false);
+                tree.setSize(32, 32);
+                tree.type = 'tree';
+                tree.hp = 5;
+                tree.chopped = false;
+                this.trees.add(tree);
             } else {
-                const rock = this.add.circle(x, y, 6, 0x555555);
-                rock.setAlpha(0.8);
+                const rock = this.add.circle(x, y, 8, 0x555555);
+                rock.setAlpha(0.85);
                 rock.setDepth(1);
-                // Add some smaller rocks
-                if (Math.random() < 0.3) {
-                    const rock2 = this.add.circle(x + 8, y + 4, 4, 0x666666);
-                    rock2.setAlpha(0.7);
-                    rock2.setDepth(1);
-                }
+                rock.setStrokeStyle(2, 0x444444);
+                
+                const rockObj = this.physics.add.staticSprite(x, y);
+                rockObj.setVisible(false);
+                rockObj.setSize(20, 20);
+                rockObj.type = 'rock';
+                rockObj.hp = 3;
+                rockObj.mined = false;
+                this.rocks.add(rockObj);
             }
         }
         
         // Add some grass patches
-        for (let i = 0; i < 200; i++) {
+        for (let i = 0; i < 300; i++) {
             const x = Phaser.Math.Between(0, CONFIG.WORLD_WIDTH);
             const y = Phaser.Math.Between(0, CONFIG.WORLD_HEIGHT);
             if (x > 2000 && x < 3000 && y > 2000 && y < 3000) continue;
             const grass = this.add.circle(x, y, 2, 0x2d6b2d);
-            grass.setAlpha(0.4);
+            grass.setAlpha(0.5);
             grass.setDepth(0);
         }
     }
@@ -416,12 +434,12 @@ class MainScene extends Phaser.Scene {
         });
 
         // Create attack visual
-        const attackRange = CONFIG.ATTACK_RANGE;
+        const attackRange = CONFIG.ATTACK_RANGE || 80;
         const comboMultiplier = 1 + (this.comboCount - 1) * 0.2;
-        const attackDamage = Math.floor(this.playerDamage * comboMultiplier);
+        const attackDamage = Math.floor((this.playerDamage || 18) * comboMultiplier);
         
         // Attack slash effect
-        const angle = Math.atan2(this.input.mousePointer.y - this.cameras.main.height/2, this.input.mousePointer.x - this.cameras.main.width/2);
+        const angle = Math.atan2(this.input.activePointer.worldY - this.player.y, this.input.activePointer.worldX - this.player.x);
         const slash = this.add.graphics();
         slash.lineStyle(4, 0x00d4ff, 1);
         slash.beginPath();
@@ -452,6 +470,28 @@ class MainScene extends Phaser.Scene {
                 }
             }
         });
+        
+        // Check for tree chopping
+        if (this.trees) {
+            this.trees.getChildren().forEach(tree => {
+                if (tree.chopped) return;
+                const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, tree.x, tree.y);
+                if (distance < attackRange + 15) {
+                    tree.hp -= 1;
+                    showNotification('Chopping tree...');
+                    if (tree.hp <= 0) {
+                        tree.chopped = true;
+                        // Drop wood
+                        if (typeof addItemToInventory === 'function') {
+                            addItemToInventory({ id: 'wood', name: 'Wood', description: 'Building material', rarity: 'common', type: 'material', base_value: 10, quantity: 3, stackable: true }, 3);
+                            showNotification('Chopped tree! Got 3 Wood');
+                        }
+                        // Remove visual
+                        tree.destroy();
+                    }
+                }
+            });
+        }
 
         // Check for PvP hits (outside safe zone)
         const level = GameState.character?.level || 1;
@@ -689,8 +729,8 @@ class MainScene extends Phaser.Scene {
     }
 
     spawnEnemy() {
-        const x = Phaser.Math.Between(1000, CONFIG.WORLD_WIDTH - 1000);
-        const y = Phaser.Math.Between(1000, CONFIG.WORLD_HEIGHT - 1000);
+        const x = Phaser.Math.Between(800, CONFIG.WORLD_WIDTH - 800);
+        const y = Phaser.Math.Between(800, CONFIG.WORLD_HEIGHT - 800);
 
         // Don't spawn in safe zone
         if (x > 2000 && x < 3000 && y > 2000 && y < 3000) {
@@ -699,23 +739,31 @@ class MainScene extends Phaser.Scene {
 
         // Determine enemy level based on distance from spawn
         const distFromSpawn = Math.sqrt((x-2500)**2 + (y-2500)**2);
-        const level = Math.max(1, Math.floor(distFromSpawn / 2000) + 1 + Math.floor(Math.random() * 3));
+        const level = Math.max(1, Math.floor(distFromSpawn / 1500) + 1 + Math.floor(Math.random() * 2));
         
         const enemy = this.physics.add.sprite(x, y, null);
-        enemy.setTint(0xff4757);
-        enemy.setSize(32, 32);
+        // Draw enemy as red circle
+        const g = this.add.graphics();
+        g.fillStyle(0xff4757, 1);
+        g.fillCircle(0, 0, 14);
+        g.lineStyle(2, 0xff0000, 1);
+        g.strokeCircle(0, 0, 14);
+        g.generateTexture('enemyTex', 32, 32);
+        g.destroy();
+        enemy.setTexture('enemyTex');
+        enemy.body.setCircle(14);
         enemy.setDepth(5);
         enemy.originalTint = 0xff4757;
         enemy.level = level;
-        enemy.hp = 60 + level * 25;
+        enemy.hp = 70 + level * 30;
         enemy.maxHp = enemy.hp;
-        enemy.damage = 12 + level * 4;
-        enemy.speed = 60 + level * 5;
+        enemy.damage = 15 + level * 5;
+        enemy.speed = 65 + level * 6;
         enemy.lastAttack = 0;
 
         // Enemy name
-        enemy.nameText = this.add.text(x, y - 35, `Lv.${level} Rogue`, {
-            fontSize: '13px',
+        enemy.nameText = this.add.text(x, y - 35, `Lv.${level} Slime`, {
+            fontSize: '12px',
             color: '#ff4757',
             fontStyle: 'bold',
             stroke: '#000000',
@@ -723,9 +771,9 @@ class MainScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(10);
 
         // HP Bar
-        enemy.hpBarBg = this.add.rectangle(x, y - 25, 40, 4, 0x000000);
-        enemy.hpBarBg.setAlpha(0.7).setDepth(9);
-        enemy.hpBar = this.add.rectangle(x - 20, y - 25, 40, 4, 0xff4757);
+        enemy.hpBarBg = this.add.rectangle(x, y - 25, 42, 5, 0x000000);
+        enemy.hpBarBg.setAlpha(0.8).setDepth(9);
+        enemy.hpBar = this.add.rectangle(x - 21, y - 25, 42, 5, 0xff4757);
         enemy.hpBar.setOrigin(0, 0.5).setDepth(10);
 
         this.enemies.add(enemy);
