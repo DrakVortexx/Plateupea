@@ -102,42 +102,62 @@ function mockLogin(username) {
 
     // Create mock character
     GameState.character = {
-        id: 'mock-character-id',
+        id: 'char-' + Date.now(),
         name: username,
         level: 1,
         experience: 0,
-        hp: CONFIG.START_HP,
-        max_hp: CONFIG.START_HP,
-        money: CONFIG.START_MONEY,
-        x: 500,
-        y: 500,
-        biome: 'forest'
+        hp: CONFIG.START_HP || 150,
+        max_hp: CONFIG.START_HP || 150,
+        mana: CONFIG.START_MANA || 50,
+        max_mana: CONFIG.START_MANA || 50,
+        money: CONFIG.START_MONEY || 200,
+        x: 2500,
+        y: 2500,
+        biome: 'forest',
+        skillPoints: 0,
+        class: 'warrior'
     };
 
     // Give starting items
     GameState.inventory = [
         {
-            id: 'wood-axe',
-            name: 'Wood Axe',
-            description: 'A basic axe for chopping wood and combat',
+            id: 'starter-sword',
+            name: 'Rusty Blade',
+            description: 'A weathered blade for beginners',
             rarity: 'common',
             type: 'weapon',
-            base_value: 10,
-            damage: 5,
+            base_value: 50,
+            damage: 12,
             defense: 0,
             quantity: 1,
-            stackable: false
+            stackable: false,
+            rarityData: CONFIG.RARITIES.common
+        },
+        {
+            id: 'health-potion',
+            name: 'Health Potion',
+            description: 'Restores 60 HP',
+            rarity: 'common',
+            type: 'consumable',
+            base_value: 25,
+            heal: 60,
+            quantity: 5,
+            stackable: true,
+            rarityData: CONFIG.RARITIES.common
         }
     ];
 
     // Save to localStorage
     localStorage.setItem('player', JSON.stringify(GameState.player));
     localStorage.setItem('character', JSON.stringify(GameState.character));
+    localStorage.setItem('inventory', JSON.stringify(GameState.inventory));
 
     // Show HUD and start game
     showHUD();
     updateHUD();
     startPhaser();
+    
+    showNotification('Welcome to Platopia! Use WASD to move, SPACE to attack!');
 }
 
 function showError(message) {

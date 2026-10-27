@@ -11,47 +11,64 @@ class MainScene extends Phaser.Scene {
         // Create player
         this.createPlayer();
 
-        // Create other players
-        this.otherPlayers = this.physics.add.group();
+        // Create other players group
+        this.otherPlayers = this.add.group();
 
-        // Create enemies
+        // Create enemies group
         this.enemies = this.physics.add.group();
+
+        // Create projectiles group
+        this.projectiles = this.physics.add.group();
+
+        // Create loot drops group
+        this.lootDrops = this.physics.add.group();
 
         // Setup controls
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys('W,A,S,D');
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+        this.qKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
-        // Setup camera
-        this.cameras.main.startFollow(this.player);
-        this.cameras.main.setZoom(1);
+        // Setup camera with smooth follow
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(1.2);
+        this.cameras.main.setLerp(0.1, 0.1);
 
         // Combat setup
         this.isAttacking = false;
-        this.attackCooldown = 500;
+        this.attackCooldown = CONFIG.ATTACK_COOLDOWN;
         this.lastAttackTime = 0;
+        this.comboCount = 0;
+        this.comboTimer = null;
+
+        // Particle effects
+        this.particles = this.add.particles('particle');
 
         // Spawn initial enemies
-        this.spawnEnemies(20);
+        this.spawnEnemies(50);
+
+        // Spawn loot periodically
+        this.time.addEvent({
+            delay: 30000,
+            callback: this.spawnLoot,
+            callbackScope: this,
+            loop: true
+        });
 
         // Update loop
         this.events.on('update', this.update, this);
     }
 
     createWorld() {
-        // Create tilemap
-        const mapWidth = CONFIG.WORLD_WIDTH / CONFIG.TILE_SIZE;
-        const mapHeight = CONFIG.WORLD_HEIGHT / CONFIG.TILE_SIZE;
+        // Create ground with gradient
+        this.ground = this.add.graphics();
+        this.ground.fillGradientStyle(0x2d5a27, 0x2d5a27, 0x1a4d1a, 0x1a4d1a, 1);
+        this.ground.fillRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
 
-        // Create ground tiles
-        this.ground = this.add.tileSprite(
-            CONFIG.WORLD_WIDTH / 2,
-            CONFIG.WORLD_HEIGHT / 2,
-            CONFIG.WORLD_WIDTH,
-            CONFIG.WORLD_HEIGHT,
-            null
-        );
-        this.ground.setFillStyle(0x228B22); // Forest green
+        // Add decorative elements
+        this.addDecorations();
 
         // Add biome regions
         this.createBiomes();
@@ -60,15 +77,36 @@ class MainScene extends Phaser.Scene {
         this.physics.world.setBounds(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
     }
 
+    addDecorations() {
+        // Add some rocks and trees for visual
+        for (let i = 0; i < 200; i++) {
+            const x = Phaser.Math.Between(0, CONFIG.WORLD_WIDTH);
+            const y = Phaser.Math.Between(0, CONFIG.WORLD_HEIGHT);
+            // Avoid safe zone
+            if (x < 2000 && y < 2000) continue;
+            
+            const type = Math.random() < 0.7 ? 'tree' : 'rock';
+            if (type === 'tree') {
+                const tree = this.add.circle(x, y, 8, 0x1a4d1a);
+                tree.setAlpha(0.8);
+            } else {
+                const rock = this.add.circle(x, y, 4, 0x666666);
+                rock.setAlpha(0.7);
+            }
+        }
+    }
+
     createBiomes() {
         const biomes = CONFIG.BIOMES;
         const regions = [
-            { x: 2000, y: 2000, width: 1500, height: 1500, biome: 'desert' },
-            { x: 5000, y: 3000, width: 2000, height: 2000, biome: 'snow' },
-            { x: 3000, y: 6000, width: 1800, height: 1800, biome: 'jungle' },
-            { x: 7000, y: 5000, width: 1500, height: 1500, biome: 'mountains' },
-            { x: 4000, y: 4000, width: 2000, height: 2000, biome: 'plains' },
-            { x: 6000, y: 2000, width: 1500, height: 1500, biome: 'swamp' }
+            { x: 3000, y: 3000, width: 2000, height: 2000, biome: 'desert' },
+            { x: 8000, y: 4000, width: 2500, height: 2500, biome: 'snow' },
+            { x: 4000, y: 9000, width: 2200, height: 2200, biome: 'jungle' },
+            { x: 12000, y: 7000, width: 2000, height: 2000, biome: 'mountains' },
+            { x: 6000, y: 6000, width: 3000, height: 3000, biome: 'plains' },
+            { x: 10000, y: 3000, width: 2000, height: 2000, biome: 'swamp' },
+            { x: 15000, y: 10000, width: 2500, height: 2500, biome: 'volcanic' },
+            { x: 5000, y: 14000, width: 3000, height: 3000, biome: 'corrupted' }
         ];
 
         regions.forEach(region => {
@@ -79,65 +117,118 @@ class MainScene extends Phaser.Scene {
                 region.height,
                 biomes[region.biome].color
             );
-            rect.setAlpha(0.5);
+            rect.setAlpha(0.4);
+            rect.setDepth(-1);
         });
 
         // Safe zone (starter village)
-        const safeZone = this.add.rectangle(500, 500, 800, 800, 0x4169E1);
-        safeZone.setAlpha(0.3);
-        this.add.text(500, 500, 'Safe Zone', {
-            fontSize: '24px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
+        const safeZone = this.add.rectangle(2500, 2500, 1200, 1200, 0x4169E1);
+        safeZone.setAlpha(0.25);
+        safeZone.setDepth(-1);
+        
+        const safeText = this.add.text(2500, 2500, 'SPAWN VILLAGE\n[SAFE ZONE]', {
+            fontSize: '28px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setDepth(10);
+        
+        // Add decorative buildings
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            const bx = 2500 + Math.cos(angle) * 400;
+            const by = 2500 + Math.sin(angle) * 400;
+            const building = this.add.rectangle(bx, by, 60, 60, 0x8b7355);
+            building.setAlpha(0.8);
+        }
     }
 
     createPlayer() {
         // Load character position
-        const startX = GameState.character?.x || 500;
-        const startY = GameState.character?.y || 500;
+        const startX = GameState.character?.x || 2500;
+        const startY = GameState.character?.y || 2500;
 
-        // Create player sprite
+        // Create player sprite with better graphics
         this.player = this.physics.add.sprite(startX, startY, null);
-        this.player.setTint(0xe94560);
-        this.player.setSize(32, 32);
+        this.player.setTint(0x00d4ff);
+        this.player.setSize(28, 28);
+        this.player.setDepth(5);
 
-        // Player name
-        this.playerName = this.add.text(startX, startY - 20, GameState.character?.name || 'Player', {
-            fontSize: '14px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
+        // Add player glow
+        this.playerGlow = this.add.circle(startX, startY, 16, 0x00d4ff, 0.3);
+        this.playerGlow.setDepth(4);
+        
+        this.tweens.add({
+            targets: this.playerGlow,
+            scaleX: 1.3,
+            scaleY: 1.3,
+            alpha: 0.1,
+            duration: 1500,
+            yoyo: true,
+            repeat: -1
+        });
+
+        // Player name with better styling
+        this.playerName = this.add.text(startX, startY - 35, GameState.character?.name || 'Player', {
+            fontSize: '16px',
+            color: '#00d4ff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 3,
+            shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 4, fill: true }
+        }).setOrigin(0.5).setDepth(10);
 
         // Movement speed
-        this.moveSpeed = 200;
+        this.moveSpeed = CONFIG.WALK_SPEED;
+        this.sprinting = false;
 
         // Player stats
-        this.playerDamage = 10;
-        this.playerDefense = 0;
+        this.playerDamage = 15 + (GameState.character?.level || 1) * 2;
+        this.playerDefense = (GameState.character?.level || 1) * 1.5;
+        this.playerMaxHp = CONFIG.START_HP + (GameState.character?.level || 1) * 10;
+        this.playerHp = GameState.character?.hp || this.playerMaxHp;
     }
 
     update() {
         if (!this.player) return;
 
+        // Handle sprinting
+        this.sprinting = this.shiftKey.isDown;
+        const currentSpeed = this.sprinting ? CONFIG.SPRINT_SPEED : CONFIG.WALK_SPEED;
+        
         // Handle movement
         let velocityX = 0;
         let velocityY = 0;
 
         if (this.cursors.left.isDown || this.wasd.A.isDown) {
-            velocityX = -this.moveSpeed;
+            velocityX = -currentSpeed;
         } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-            velocityX = this.moveSpeed;
+            velocityX = currentSpeed;
         }
 
         if (this.cursors.up.isDown || this.wasd.W.isDown) {
-            velocityY = -this.moveSpeed;
+            velocityY = -currentSpeed;
         } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-            velocityY = this.moveSpeed;
+            velocityY = currentSpeed;
+        }
+
+        // Normalize diagonal movement
+        if (velocityX !== 0 && velocityY !== 0) {
+            velocityX *= 0.707;
+            velocityY *= 0.707;
         }
 
         this.player.setVelocity(velocityX, velocityY);
+        
+        // Update player glow position
+        if (this.playerGlow) {
+            this.playerGlow.setPosition(this.player.x, this.player.y);
+        }
 
         // Update player name position
-        this.playerName.setPosition(this.player.x, this.player.y - 20);
+        this.playerName.setPosition(this.player.x, this.player.y - 35);
 
         // Handle attack
         if (this.spaceKey.isDown && !this.isAttacking) {
@@ -157,7 +248,8 @@ class MainScene extends Phaser.Scene {
                 GameState.socket.emit('player_move', {
                     characterId: GameState.character.id,
                     x: this.player.x,
-                    y: this.player.y
+                    y: this.player.y,
+                    sprinting: this.sprinting
                 });
             }
         }
@@ -167,54 +259,85 @@ class MainScene extends Phaser.Scene {
 
         // Update enemies
         this.updateEnemies();
+
+        // Update loot
+        this.updateLoot();
     }
 
     checkBiome() {
+        if (!GameState.character) return;
         const x = this.player.x;
         const y = this.player.y;
 
         let currentBiome = 'forest';
 
-        // Simple biome detection based on position
-        if (x < 1500 && y < 1500) {
+        // Biome detection based on position
+        if (x > 2000 && x < 3000 && y > 2000 && y < 3000) {
             currentBiome = 'forest'; // Safe zone area
-        } else if (x > 2000 && x < 3500 && y > 2000 && y < 3500) {
+        } else if (x > 3000 && x < 5000 && y > 3000 && y < 5000) {
             currentBiome = 'desert';
-        } else if (x > 5000 && x < 7000 && y > 3000 && y < 5000) {
+        } else if (x > 8000 && x < 10500 && y > 4000 && y < 6500) {
             currentBiome = 'snow';
-        } else if (x > 3000 && x < 4800 && y > 6000 && y < 7800) {
+        } else if (x > 4000 && x < 6200 && y > 9000 && y < 11200) {
             currentBiome = 'jungle';
-        } else if (x > 7000 && x < 8500 && y > 5000 && y < 6500) {
+        } else if (x > 12000 && x < 14000 && y > 7000 && y < 9000) {
             currentBiome = 'mountains';
-        } else if (x > 4000 && x < 6000 && y > 4000 && y < 6000) {
+        } else if (x > 6000 && x < 9000 && y > 6000 && y < 9000) {
             currentBiome = 'plains';
-        } else if (x > 6000 && x < 7500 && y > 2000 && y < 3500) {
+        } else if (x > 10000 && x < 12000 && y > 3000 && y < 5000) {
             currentBiome = 'swamp';
+        } else if (x > 15000 && x < 17500 && y > 10000 && y < 12500) {
+            currentBiome = 'volcanic';
+        } else if (x > 5000 && x < 8000 && y > 14000 && y < 17000) {
+            currentBiome = 'corrupted';
         }
 
-        GameState.character.biome = currentBiome;
+        if (GameState.character.biome !== currentBiome) {
+            GameState.character.biome = currentBiome;
+            showNotification(`Entering ${CONFIG.BIOMES[currentBiome].name}`);
+        }
         document.getElementById('current-biome').textContent = CONFIG.BIOMES[currentBiome].name;
         document.getElementById('current-position').textContent = `${Math.floor(x)}, ${Math.floor(y)}`;
     }
 
     updateOtherPlayers() {
+        if (!GameState.otherPlayers) return;
+        
         GameState.otherPlayers.forEach((data, characterId) => {
-            let otherPlayer = this.otherPlayers.get(characterId);
+            if (characterId === GameState.character?.id) return;
+            
+            let otherPlayer = this.otherPlayers.getChildren().find(p => p.characterId === characterId);
 
             if (!otherPlayer) {
-                otherPlayer = this.physics.add.sprite(data.x, data.y, null);
-                otherPlayer.setTint(0x4e9eff);
-                otherPlayer.setSize(32, 32);
+                otherPlayer = this.physics.add.sprite(data.x || 0, data.y || 0, null);
+                otherPlayer.setTint(0xff4757);
+                otherPlayer.setSize(28, 28);
+                otherPlayer.setDepth(5);
+                otherPlayer.characterId = characterId;
                 this.otherPlayers.add(otherPlayer);
 
-                const name = this.add.text(data.x, data.y - 20, data.name, {
+                otherPlayer.glow = this.add.circle(data.x, data.y, 16, 0xff4757, 0.2);
+                otherPlayer.glow.setDepth(4);
+                
+                const name = this.add.text(data.x, data.y - 35, data.name || 'Player', {
                     fontSize: '14px',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
+                    color: '#ff4757',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(10);
                 otherPlayer.nameText = name;
+                otherPlayer.levelText = this.add.text(data.x, data.y + 25, `Lv.${data.level || 1}`, {
+                    fontSize: '11px',
+                    color: '#ffd700',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(10);
             } else {
-                otherPlayer.setPosition(data.x, data.y);
-                otherPlayer.nameText.setPosition(data.x, data.y - 20);
+                otherPlayer.setPosition(data.x || 0, data.y || 0);
+                if (otherPlayer.glow) otherPlayer.glow.setPosition(data.x, data.y);
+                if (otherPlayer.nameText) otherPlayer.nameText.setPosition(data.x, data.y - 35);
+                if (otherPlayer.levelText) otherPlayer.levelText.setPosition(data.x, data.y + 25);
             }
         });
     }
@@ -225,16 +348,35 @@ class MainScene extends Phaser.Scene {
 
         this.isAttacking = true;
         this.lastAttackTime = now;
+        this.comboCount++;
+
+        // Reset combo after delay
+        if (this.comboTimer) this.comboTimer.remove();
+        this.comboTimer = this.time.delayedCall(1200, () => {
+            this.comboCount = 0;
+        });
 
         // Create attack visual
-        const attackRange = 60;
-        const attackCircle = this.add.circle(this.player.x, this.player.y, attackRange, 0xe94560, 0.5);
+        const attackRange = CONFIG.ATTACK_RANGE;
+        const comboMultiplier = 1 + (this.comboCount - 1) * 0.2;
+        const attackDamage = Math.floor(this.playerDamage * comboMultiplier);
+        
+        // Attack slash effect
+        const angle = Math.atan2(this.input.mousePointer.y - this.cameras.main.height/2, this.input.mousePointer.x - this.cameras.main.width/2);
+        const slash = this.add.graphics();
+        slash.lineStyle(4, 0x00d4ff, 1);
+        slash.beginPath();
+        slash.arc(this.player.x, this.player.y, attackRange, angle - Math.PI/4, angle + Math.PI/4, false);
+        slash.strokePath();
+        
         this.tweens.add({
-            targets: attackCircle,
+            targets: slash,
             alpha: 0,
-            duration: 200,
+            scaleX: 1.5,
+            scaleY: 1.5,
+            duration: 250,
             onComplete: () => {
-                attackCircle.destroy();
+                slash.destroy();
                 this.isAttacking = false;
             }
         });
@@ -242,32 +384,68 @@ class MainScene extends Phaser.Scene {
         // Check for enemy hits
         this.enemies.getChildren().forEach(enemy => {
             const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
-            if (distance < attackRange) {
-                this.damageEnemy(enemy, this.playerDamage);
+            if (distance < attackRange + 10) {
+                // Check if in front arc
+                const enemyAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+                const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(enemyAngle - angle));
+                if (angleDiff < Math.PI/3 || this.comboCount > 2) {
+                    this.damageEnemy(enemy, attackDamage);
+                }
             }
         });
 
         // Check for PvP hits (outside safe zone)
-        if (GameState.character.level > CONFIG.NOOB_PROTECTION_LEVEL) {
+        const level = GameState.character?.level || 1;
+        if (level > CONFIG.NOOB_PROTECTION_LEVEL) {
             const x = this.player.x;
             const y = this.player.y;
-            const inSafeZone = x < 1500 && y < 1500;
+            const inSafeZone = x > 2000 && x < 3000 && y > 2000 && y < 3000;
 
             if (!inSafeZone) {
                 this.otherPlayers.getChildren().forEach(otherPlayer => {
                     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, otherPlayer.x, otherPlayer.y);
-                    if (distance < attackRange) {
-                        this.damagePlayer(otherPlayer, this.playerDamage);
+                    if (distance < attackRange + 10) {
+                        const enemyAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, otherPlayer.x, otherPlayer.y);
+                        const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(enemyAngle - angle));
+                        if (angleDiff < Math.PI/3) {
+                            this.damagePlayer(otherPlayer, attackDamage);
+                        }
                     }
                 });
+            } else {
+                showNotification('PvP disabled in safe zone');
             }
         }
     }
 
     damageEnemy(enemy, damage) {
-        enemy.hp -= damage;
+        // Critical hit
+        const isCrit = Math.random() < CONFIG.CRIT_CHANCE;
+        const finalDamage = isCrit ? Math.floor(damage * CONFIG.CRIT_MULTIPLIER) : damage;
+        
+        enemy.hp -= finalDamage;
         enemy.setTint(0xff0000);
-        this.time.delayedCall(100, () => enemy.setTint(0xff9900));
+        
+        // Damage number
+        const dmgText = this.add.text(enemy.x, enemy.y - 10, isCrit ? `-${finalDamage} CRIT!` : `-${finalDamage}`, {
+            fontSize: isCrit ? '16px' : '14px',
+            color: isCrit ? '#ffd700' : '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: dmgText,
+            y: enemy.y - 40,
+            alpha: 0,
+            duration: 800,
+            onComplete: () => dmgText.destroy()
+        });
+        
+        this.time.delayedCall(100, () => {
+            if (enemy.active) enemy.setTint(enemy.originalTint || 0xff6b6b);
+        });
 
         if (enemy.hp <= 0) {
             // Enemy defeated
@@ -276,44 +454,136 @@ class MainScene extends Phaser.Scene {
     }
 
     destroyEnemy(enemy) {
-        // Give XP and money
-        const xpReward = 50;
-        const moneyReward = 10;
+        if (!GameState.character) return;
+        
+        // Give XP and money based on enemy level
+        const enemyLevel = enemy.level || 1;
+        const xpReward = Math.floor(75 * enemyLevel * (1 + Math.random() * 0.3));
+        const moneyReward = Math.floor(15 * enemyLevel * (1 + Math.random() * 0.5));
 
-        GameState.character.experience += xpReward;
-        GameState.character.money += moneyReward;
+        GameState.character.experience = (GameState.character.experience || 0) + xpReward;
+        GameState.character.money = (GameState.character.money || 0) + moneyReward;
+
+        // Check level up
+        this.checkLevelUp();
 
         // Chance to drop item
-        if (Math.random() < 0.3) {
-            const droppedItem = this.getRandomDrop();
+        const dropChance = 0.4 * CONFIG.BIOMES[GameState.character.biome]?.lootBonus || 1;
+        if (Math.random() < dropChance) {
+            const droppedItem = this.getRandomDrop(enemyLevel);
             if (droppedItem) {
-                addItemToInventory(droppedItem);
-                showNotification(`Looted: ${droppedItem.name}`);
+                this.spawnLootDrop(enemy.x, enemy.y, droppedItem);
             }
         }
 
-        showNotification(`Enemy defeated! +${xpReward} XP, +$${moneyReward}`);
+        showNotification(`+${xpReward} XP | +$${moneyReward}`);
         updateHUD();
 
         // Respawn enemy after delay
-        this.time.delayedCall(10000, () => {
+        this.time.delayedCall(8000, () => {
             this.spawnEnemy();
         });
 
+        if (enemy.nameText) enemy.nameText.destroy();
+        if (enemy.hpBar) enemy.hpBar.destroy();
+        if (enemy.hpBarBg) enemy.hpBarBg.destroy();
         enemy.destroy();
     }
 
-    getRandomDrop() {
-        const drops = [
-            { id: 'health-potion', name: 'Health Potion', description: 'Restores 50 HP', rarity: 'common', type: 'consumable', base_value: 20, quantity: 1, stackable: true },
-            { id: 'wood', name: 'Wood', description: 'Basic building material', rarity: 'common', type: 'material', base_value: 5, quantity: 5, stackable: true },
-            { id: 'iron-sword', name: 'Iron Sword', description: 'A sturdy iron sword', rarity: 'uncommon', type: 'weapon', base_value: 50, damage: 15, defense: 0, quantity: 1, stackable: false }
-        ];
+    getRandomDrop(level = 1) {
+        const rarityRoll = Math.random();
+        let rarity = 'common';
+        
+        for (const [r, data] of Object.entries(CONFIG.RARITIES)) {
+            if (rarityRoll < data.chance) {
+                rarity = r;
+                break;
+            }
+        }
+        
+        const itemPool = {
+            common: [
+                { id: 'health-potion', name: 'Health Potion', description: 'Restores 60 HP', rarity: 'common', type: 'consumable', base_value: 25, heal: 60, quantity: 1, stackable: true },
+                { id: 'wood', name: 'Wood', description: 'Building material', rarity: 'common', type: 'material', base_value: 8, quantity: Math.floor(Math.random()*5)+3, stackable: true },
+                { id: 'stone', name: 'Stone', description: 'Building material', rarity: 'common', type: 'material', base_value: 10, quantity: Math.floor(Math.random()*4)+2, stackable: true }
+            ],
+            uncommon: [
+                { id: 'iron-sword', name: 'Iron Sword', description: 'Sturdy blade', rarity: 'uncommon', type: 'weapon', base_value: 80, damage: 18 + level, defense: 0, quantity: 1, stackable: false },
+                { id: 'leather-armor', name: 'Leather Armor', description: 'Light protection', rarity: 'uncommon', type: 'armor', base_value: 70, damage: 0, defense: 12, quantity: 1, stackable: false }
+            ],
+            rare: [
+                { id: 'steel-sword', name: 'Steel Sword', description: 'Sharp steel blade', rarity: 'rare', type: 'weapon', base_value: 250, damage: 28 + level*2, defense: 0, quantity: 1, stackable: false },
+                { id: 'chainmail', name: 'Chainmail Armor', description: 'Reinforced armor', rarity: 'rare', type: 'armor', base_value: 200, damage: 0, defense: 22, quantity: 1, stackable: false }
+            ],
+            epic: [
+                { id: 'crystal-blade', name: 'Crystal Blade', description: 'Mystic power flows through', rarity: 'epic', type: 'weapon', base_value: 800, damage: 45 + level*3, defense: 0, quantity: 1, stackable: false }
+            ]
+        };
+        
+        const pool = itemPool[rarity] || itemPool.common;
+        const item = {...pool[Math.floor(Math.random() * pool.length)]};
+        item.rarityData = CONFIG.RARITIES[rarity];
+        return item;
+    }
 
-        const rarityChance = Math.random();
-        if (rarityChance < 0.7) return drops[0]; // 70% common
-        if (rarityChance < 0.9) return drops[1]; // 20% uncommon
-        return drops[2]; // 10% rare
+    spawnLootDrop(x, y, item) {
+        const drop = this.physics.add.sprite(x, y, null);
+        drop.setTint(parseInt(CONFIG.RARITIES[item.rarity].color.replace('#', '0x')));
+        drop.setSize(16, 16);
+        drop.item = item;
+        drop.setDepth(3);
+        
+        // Float animation
+        this.tweens.add({
+            targets: drop,
+            y: y - 10,
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Glow
+        drop.glow = this.add.circle(x, y, 12, parseInt(CONFIG.RARITIES[item.rarity].color.replace('#', '0x')), 0.3);
+        drop.glow.setDepth(2);
+        
+        this.lootDrops.add(drop);
+        
+        // Auto-despawn after 60 seconds
+        this.time.delayedCall(60000, () => {
+            if (drop.active) {
+                if (drop.glow) drop.glow.destroy();
+                drop.destroy();
+            }
+        });
+    }
+
+    updateLoot() {
+        this.lootDrops.getChildren().forEach(drop => {
+            if (drop.glow) drop.glow.setPosition(drop.x, drop.y);
+            
+            // Check pickup range
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y);
+            if (dist < 50) {
+                // Auto pickup
+                if (typeof addItemToInventory === 'function') {
+                    addItemToInventory(drop.item);
+                }
+                showNotification(`Picked up: ${drop.item.name}`);
+                if (drop.glow) drop.glow.destroy();
+                drop.destroy();
+            }
+        });
+    }
+
+    spawnLoot() {
+        // Spawn random loot in world
+        const x = Phaser.Math.Between(1000, CONFIG.WORLD_WIDTH - 1000);
+        const y = Phaser.Math.Between(1000, CONFIG.WORLD_HEIGHT - 1000);
+        if (x < 2000 && y < 2000) return;
+        
+        const item = this.getRandomDrop(3);
+        this.spawnLootDrop(x, y, item);
     }
 
     damagePlayer(otherPlayer, damage) {
@@ -360,59 +630,129 @@ class MainScene extends Phaser.Scene {
     }
 
     spawnEnemy() {
-        const x = Phaser.Math.Between(500, CONFIG.WORLD_WIDTH - 500);
-        const y = Phaser.Math.Between(500, CONFIG.WORLD_HEIGHT - 500);
+        const x = Phaser.Math.Between(1000, CONFIG.WORLD_WIDTH - 1000);
+        const y = Phaser.Math.Between(1000, CONFIG.WORLD_HEIGHT - 1000);
 
         // Don't spawn in safe zone
-        if (x < 1500 && y < 1500) {
+        if (x > 2000 && x < 3000 && y > 2000 && y < 3000) {
             return this.spawnEnemy();
         }
 
+        // Determine enemy level based on distance from spawn
+        const distFromSpawn = Math.sqrt((x-2500)**2 + (y-2500)**2);
+        const level = Math.max(1, Math.floor(distFromSpawn / 2000) + 1 + Math.floor(Math.random() * 3));
+        
         const enemy = this.physics.add.sprite(x, y, null);
-        enemy.setTint(0xff9900);
+        enemy.setTint(0xff4757);
         enemy.setSize(32, 32);
-        enemy.hp = 50;
-        enemy.maxHp = 50;
-        enemy.damage = 10;
-        enemy.speed = 50;
+        enemy.setDepth(5);
+        enemy.originalTint = 0xff4757;
+        enemy.level = level;
+        enemy.hp = 60 + level * 25;
+        enemy.maxHp = enemy.hp;
+        enemy.damage = 12 + level * 4;
+        enemy.speed = 60 + level * 5;
+        enemy.lastAttack = 0;
 
         // Enemy name
-        enemy.nameText = this.add.text(x, y - 20, 'Enemy', {
-            fontSize: '12px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
+        enemy.nameText = this.add.text(x, y - 35, `Lv.${level} Rogue`, {
+            fontSize: '13px',
+            color: '#ff4757',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5).setDepth(10);
+
+        // HP Bar
+        enemy.hpBarBg = this.add.rectangle(x, y - 25, 40, 4, 0x000000);
+        enemy.hpBarBg.setAlpha(0.7).setDepth(9);
+        enemy.hpBar = this.add.rectangle(x - 20, y - 25, 40, 4, 0xff4757);
+        enemy.hpBar.setOrigin(0, 0.5).setDepth(10);
 
         this.enemies.add(enemy);
     }
 
     updateEnemies() {
         this.enemies.getChildren().forEach(enemy => {
-            // Simple AI: move towards player if close
-            const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
-
-            if (distance < 300) {
-                // Move towards player
-                const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
-                enemy.setVelocity(Math.cos(angle) * enemy.speed, Math.sin(angle) * enemy.speed);
-
-                // Attack if close
-                if (distance < 40) {
-                    this.time.delayedCall(1000, () => {
-                        if (Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) < 40) {
-                            this.takeDamage(enemy.damage);
-                        }
-                    });
-                }
-            } else {
-                // Wander randomly
-                if (Math.random() < 0.02) {
-                    const randomAngle = Math.random() * Math.PI * 2;
-                    enemy.setVelocity(Math.cos(randomAngle) * enemy.speed * 0.5, Math.sin(randomAngle) * enemy.speed * 0.5);
+            if (!enemy.active) return;
+            
+            // Update name and HP bar positions
+            if (enemy.nameText) enemy.nameText.setPosition(enemy.x, enemy.y - 35);
+            if (enemy.hpBarBg) {
+                enemy.hpBarBg.setPosition(enemy.x, enemy.y - 25);
+                const hpPercent = enemy.hp / enemy.maxHp;
+                if (enemy.hpBar) {
+                    enemy.hpBar.width = 40 * hpPercent;
+                    enemy.hpBar.setPosition(enemy.x - 20, enemy.y - 25);
+                    enemy.hpBar.setFillStyle(hpPercent > 0.3 ? 0xff4757 : 0xff0000);
                 }
             }
 
-            // Update name position
-            enemy.nameText.setPosition(enemy.x, enemy.y - 20);
+            const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+
+            if (distance < 400) {
+                // Aggressive AI - chase player
+                const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+                enemy.setVelocity(Math.cos(angle) * enemy.speed, Math.sin(angle) * enemy.speed);
+
+                // Attack if in range
+                const now = Date.now();
+                if (distance < 50 && now - enemy.lastAttack > 1500) {
+                    enemy.lastAttack = now;
+                    this.enemyAttack(enemy);
+                }
+            } else if (distance < 800) {
+                // Cautious - move slower towards
+                const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+                enemy.setVelocity(Math.cos(angle) * enemy.speed * 0.6, Math.sin(angle) * enemy.speed * 0.6);
+            } else {
+                // Wander
+                if (Math.random() < 0.01) {
+                    const randomAngle = Math.random() * Math.PI * 2;
+                    enemy.setVelocity(Math.cos(randomAngle) * enemy.speed * 0.3, Math.sin(randomAngle) * enemy.speed * 0.3);
+                }
+            }
         });
+    }
+
+    enemyAttack(enemy) {
+        // Enemy attack visual
+        const attackCircle = this.add.circle(enemy.x, enemy.y, 35, 0xff4757, 0.4);
+        this.tweens.add({
+            targets: attackCircle,
+            alpha: 0,
+            scaleX: 1.5,
+            scaleY: 1.5,
+            duration: 200,
+            onComplete: () => attackCircle.destroy()
+        });
+        
+        const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+        if (dist < 60) {
+            this.takeDamage(enemy.damage);
+        }
+    }
+
+    checkLevelUp() {
+        if (!GameState.character) return;
+        const xpNeeded = this.getXPForLevel(GameState.character.level);
+        if ((GameState.character.experience || 0) >= xpNeeded) {
+            GameState.character.level++;
+            GameState.character.experience -= xpNeeded;
+            GameState.character.skillPoints = (GameState.character.skillPoints || 0) + CONFIG.SKILL_POINTS_PER_LEVEL;
+            this.playerDamage += 3;
+            this.playerDefense += 2;
+            this.playerMaxHp += 15;
+            this.playerHp = this.playerMaxHp;
+            GameState.character.hp = this.playerHp;
+            GameState.character.max_hp = this.playerMaxHp;
+            
+            showNotification(`LEVEL UP! Level ${GameState.character.level}`);
+            updateHUD();
+        }
+    }
+
+    getXPForLevel(level) {
+        return Math.floor(100 * Math.pow(1.4, level));
     }
 }

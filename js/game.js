@@ -117,21 +117,25 @@ function showNotification(message) {
 function updateHUD() {
     if (!GameState.character) return;
 
-    document.getElementById('player-name').textContent = GameState.character.name;
-    document.getElementById('player-level').textContent = `Level ${GameState.character.level}`;
-    document.getElementById('health-text').textContent = `${GameState.character.hp}/${GameState.character.max_hp}`;
-    document.getElementById('health-fill').style.width = `${(GameState.character.hp / GameState.character.max_hp) * 100}%`;
-    document.getElementById('money-display').textContent = GameState.character.money;
+    document.getElementById('player-name').textContent = GameState.character.name || GameState.player?.username || 'Player';
+    document.getElementById('player-level').textContent = `Level ${GameState.character.level || 1}`;
+    const hp = GameState.character.hp || 150;
+    const maxHp = GameState.character.max_hp || 150;
+    document.getElementById('health-text').textContent = `${Math.floor(hp)}/${maxHp}`;
+    document.getElementById('health-fill').style.width = `${Math.max(0, (hp / maxHp) * 100)}%`;
+    document.getElementById('money-display').textContent = GameState.character.money || 0;
 
-    const xpForLevel = getXPForLevel(GameState.character.level);
-    const xpProgress = (GameState.character.experience % xpForLevel) / xpForLevel * 100;
-    document.getElementById('xp-text').textContent = `${GameState.character.experience}/${xpForLevel} XP`;
-    document.getElementById('xp-fill').style.width = `${xpProgress}%`;
+    const level = GameState.character.level || 1;
+    const xpForLevel = getXPForLevel(level);
+    const currentXp = GameState.character.experience || 0;
+    const xpProgress = (currentXp / xpForLevel) * 100;
+    document.getElementById('xp-text').textContent = `${currentXp}/${xpForLevel} XP`;
+    document.getElementById('xp-fill').style.width = `${Math.min(100, xpProgress)}%`;
 }
 
 // Get XP required for level
 function getXPForLevel(level) {
-    return Math.floor(100 * Math.pow(1.5, level - 1));
+    return Math.floor(100 * Math.pow(1.4, level));
 }
 
 // Save character data
