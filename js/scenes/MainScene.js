@@ -64,8 +64,20 @@ class MainScene extends Phaser.Scene {
     createWorld() {
         // Create ground with gradient
         this.ground = this.add.graphics();
-        this.ground.fillGradientStyle(0x2d5a27, 0x2d5a27, 0x1a4d1a, 0x1a4d1a, 1);
+        this.ground.fillGradientStyle(0x1e4d2b, 0x1e4d2b, 0x0f2f1a, 0x0f2f1a, 1);
         this.ground.fillRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
+        
+        // Add grid pattern for better visuals
+        this.ground.lineStyle(1, 0x2a5a3a, 0.3);
+        for (let x = 0; x < CONFIG.WORLD_WIDTH; x += 64) {
+            this.ground.moveTo(x, 0);
+            this.ground.lineTo(x, CONFIG.WORLD_HEIGHT);
+        }
+        for (let y = 0; y < CONFIG.WORLD_HEIGHT; y += 64) {
+            this.ground.moveTo(0, y);
+            this.ground.lineTo(CONFIG.WORLD_WIDTH, y);
+        }
+        this.ground.strokePath();
 
         // Add decorative elements
         this.addDecorations();
@@ -150,44 +162,60 @@ class MainScene extends Phaser.Scene {
         const startX = GameState.character?.x || 2500;
         const startY = GameState.character?.y || 2500;
 
-        // Create player sprite with better graphics
+        // Create player with better graphics - drawn shape
         this.player = this.physics.add.sprite(startX, startY, null);
-        this.player.setTint(0x00d4ff);
-        this.player.setSize(28, 28);
-        this.player.setDepth(5);
+        this.player.setDisplaySize(32, 32);
+        this.player.setDepth(6);
+        
+        // Draw player as a circle with outline
+        const playerGraphics = this.add.graphics();
+        playerGraphics.fillStyle(0x00d4ff, 1);
+        playerGraphics.fillCircle(0, 0, 14);
+        playerGraphics.lineStyle(3, 0xffffff, 1);
+        playerGraphics.strokeCircle(0, 0, 14);
+        playerGraphics.lineStyle(2, 0x0099ff, 1);
+        playerGraphics.beginPath();
+        playerGraphics.moveTo(0, -14);
+        playerGraphics.lineTo(0, -18);
+        playerGraphics.strokePath();
+        playerGraphics.generateTexture('playerTex', 40, 40);
+        playerGraphics.destroy();
+        
+        this.player.setTexture('playerTex');
+        this.player.body.setCircle(14);
 
         // Add player glow
-        this.playerGlow = this.add.circle(startX, startY, 16, 0x00d4ff, 0.3);
+        this.playerGlow = this.add.circle(startX, startY, 18, 0x00d4ff, 0.25);
         this.playerGlow.setDepth(4);
         
         this.tweens.add({
             targets: this.playerGlow,
-            scaleX: 1.3,
-            scaleY: 1.3,
-            alpha: 0.1,
+            scaleX: 1.4,
+            scaleY: 1.4,
+            alpha: 0.05,
             duration: 1500,
             yoyo: true,
             repeat: -1
         });
 
         // Player name with better styling
-        this.playerName = this.add.text(startX, startY - 35, GameState.character?.name || 'Player', {
+        this.playerName = this.add.text(startX, startY - 40, GameState.character?.name || 'Player', {
             fontSize: '16px',
             color: '#00d4ff',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 3,
+            strokeThickness: 4,
             shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 4, fill: true }
-        }).setOrigin(0.5).setDepth(10);
+        }).setOrigin(0.5).setDepth(12);
 
         // Movement speed
-        this.moveSpeed = CONFIG.WALK_SPEED;
+        this.moveSpeed = CONFIG.WALK_SPEED || 180;
         this.sprinting = false;
 
         // Player stats
-        this.playerDamage = 15 + (GameState.character?.level || 1) * 2;
-        this.playerDefense = (GameState.character?.level || 1) * 1.5;
-        this.playerMaxHp = CONFIG.START_HP + (GameState.character?.level || 1) * 10;
+        this.playerDamage = 18 + (GameState.character?.level || 1) * 3;
+        this.playerDefense = (GameState.character?.level || 1) * 2;
+        this.playerMaxHp = CONFIG.START_HP || 150 + (GameState.character?.level || 1) * 12;
         this.playerHp = GameState.character?.hp || this.playerMaxHp;
     }
 
@@ -195,22 +223,24 @@ class MainScene extends Phaser.Scene {
         if (!this.player) return;
 
         // Handle sprinting
-        this.sprinting = this.shiftKey.isDown;
-        const currentSpeed = this.sprinting ? CONFIG.SPRINT_SPEED : CONFIG.WALK_SPEED;
+        this.sprinting = this.shiftKey && this.shiftKey.isDown;
+        const walkSpeed = CONFIG.WALK_SPEED || 180;
+        const sprintSpeed = CONFIG.SPRINT_SPEED || 280;
+        const currentSpeed = this.sprinting ? sprintSpeed : walkSpeed;
         
         // Handle movement
         let velocityX = 0;
         let velocityY = 0;
 
-        if (this.cursors.left.isDown || this.wasd.A.isDown) {
+        if (this.cursors && (this.cursors.left.isDown || (this.wasd && this.wasd.A && this.wasd.A.isDown))) {
             velocityX = -currentSpeed;
-        } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+        } else if (this.cursors && (this.cursors.right.isDown || (this.wasd && this.wasd.D && this.wasd.D.isDown))) {
             velocityX = currentSpeed;
         }
 
-        if (this.cursors.up.isDown || this.wasd.W.isDown) {
+        if (this.cursors && (this.cursors.up.isDown || (this.wasd && this.wasd.W && this.wasd.W.isDown))) {
             velocityY = -currentSpeed;
-        } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
+        } else if (this.cursors && (this.cursors.down.isDown || (this.wasd && this.wasd.S && this.wasd.S.isDown))) {
             velocityY = currentSpeed;
         }
 
@@ -228,10 +258,12 @@ class MainScene extends Phaser.Scene {
         }
 
         // Update player name position
-        this.playerName.setPosition(this.player.x, this.player.y - 35);
+        if (this.playerName) {
+            this.playerName.setPosition(this.player.x, this.player.y - 40);
+        }
 
         // Handle attack
-        if (this.spaceKey.isDown && !this.isAttacking) {
+        if (this.spaceKey && this.spaceKey.isDown && !this.isAttacking) {
             this.attack();
         }
 
@@ -244,7 +276,7 @@ class MainScene extends Phaser.Scene {
             GameState.character.y = this.player.y;
 
             // Emit position update
-            if (GameState.socket) {
+            if (GameState.socket && GameState.socket.emit) {
                 GameState.socket.emit('player_move', {
                     characterId: GameState.character.id,
                     x: this.player.x,
@@ -294,10 +326,14 @@ class MainScene extends Phaser.Scene {
 
         if (GameState.character.biome !== currentBiome) {
             GameState.character.biome = currentBiome;
-            showNotification(`Entering ${CONFIG.BIOMES[currentBiome].name}`);
+            if (typeof showNotification === 'function') {
+                showNotification(`Entering ${CONFIG.BIOMES && CONFIG.BIOMES[currentBiome] ? CONFIG.BIOMES[currentBiome].name : currentBiome}`);
+            }
         }
-        document.getElementById('current-biome').textContent = CONFIG.BIOMES[currentBiome].name;
-        document.getElementById('current-position').textContent = `${Math.floor(x)}, ${Math.floor(y)}`;
+        const biomeEl = document.getElementById('current-biome');
+        if (biomeEl) biomeEl.textContent = CONFIG.BIOMES && CONFIG.BIOMES[currentBiome] ? CONFIG.BIOMES[currentBiome].name : currentBiome;
+        const posEl = document.getElementById('current-position');
+        if (posEl) posEl.textContent = `${Math.floor(x)}, ${Math.floor(y)}`;
     }
 
     updateOtherPlayers() {

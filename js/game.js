@@ -37,9 +37,21 @@ function showHUD() {
 
 // Start game
 function startGame() {
-    initSupabase();
-    connectSocket();
-    initPhaser();
+    try {
+        initSupabase();
+    } catch(e) {
+        console.warn('Supabase init failed:', e);
+    }
+    try {
+        connectSocket();
+    } catch(e) {
+        console.warn('Socket init failed:', e);
+    }
+    if (typeof startPhaser === 'function') {
+        startPhaser();
+    } else if (typeof initPhaser === 'function') {
+        initPhaser();
+    }
 }
 
 // Connect to socket

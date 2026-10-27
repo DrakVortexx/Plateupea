@@ -146,6 +146,36 @@
 
     <!-- Notification -->
     <div id="notification" class="notification hidden"></div>
+    
+    <!-- Tutorial -->
+    <div id="tutorial" class="tutorial hidden">
+        <div class="tutorial-panel">
+            <h2>Welcome to Platopia</h2>
+            <div class="tutorial-steps">
+                <div class="tutorial-step active" data-step="1">
+                    <h3>Movement</h3>
+                    <p>Use <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move around the world</p>
+                </div>
+                <div class="tutorial-step" data-step="2">
+                    <h3>Combat</h3>
+                    <p>Press <kbd>SPACE</kbd> to attack enemies and players</p>
+                </div>
+                <div class="tutorial-step" data-step="3">
+                    <h3>UI</h3>
+                    <p>Press <kbd>I</kbd> for Inventory, <kbd>M</kbd> for Map, <kbd>Q</kbd> for Quests</p>
+                </div>
+                <div class="tutorial-step" data-step="4">
+                    <h3>Survival</h3>
+                    <p>You have noob protection for first 15 levels. Death drops everything except stash!</p>
+                </div>
+            </div>
+            <div class="tutorial-nav">
+                <button id="tutorial-prev" class="tutorial-btn">Previous</button>
+                <span id="tutorial-counter">1 / 4</span>
+                <button id="tutorial-next" class="tutorial-btn tutorial-btn-primary">Next</button>
+            </div>
+        </div>
+    </div>
 
     <script src="js/config.js"></script>
     <script src="js/supabaseClient.js"></script>
@@ -159,5 +189,6 @@
     <script src="js/ui/team.js"></script>
     <script src="js/ui/stash.js"></script>
     <script src="js/main.js"></script>
+    <script src="js/tutorial.js"></script>
 </body>
 </html>

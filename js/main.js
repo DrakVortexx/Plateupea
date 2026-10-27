@@ -170,12 +170,16 @@ function showError(message) {
 }
 
 function startPhaser() {
+    if (typeof Phaser === 'undefined') {
+        console.error('Phaser not loaded');
+        return;
+    }
     const config = {
         type: Phaser.AUTO,
         width: window.innerWidth,
         height: window.innerHeight,
         parent: 'game-container',
-        backgroundColor: '#1a1a2e',
+        backgroundColor: '#0a1a0a',
         scene: [MainScene, UIScene],
         physics: {
             default: 'arcade',
@@ -187,10 +191,17 @@ function startPhaser() {
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
-        }
+        },
+        pixelArt: false,
+        antialias: true
     };
 
     game = new Phaser.Game(config);
+}
+
+// Alias for compatibility
+if (typeof initPhaser === 'undefined') {
+    window.initPhaser = startPhaser;
 }
 
 // Handle window resize

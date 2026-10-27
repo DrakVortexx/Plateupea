@@ -3,6 +3,10 @@ let supabaseClientInstance = null;
 
 function initSupabase() {
     try {
+        if (typeof CONFIG === 'undefined') {
+            console.warn('CONFIG not loaded yet');
+            return null;
+        }
         const supabaseUrl = localStorage.getItem('supabase_url') || CONFIG.SUPABASE_URL;
         const supabaseKey = localStorage.getItem('supabase_key') || CONFIG.SUPABASE_KEY;
 
@@ -16,7 +20,7 @@ function initSupabase() {
             return supabaseClientInstance;
         }
     } catch (e) {
-        console.error('Supabase init error:', e);
+        console.warn('Supabase init error:', e);
     }
     return null;
 }
