@@ -82,8 +82,21 @@ async function handleRegister() {
 
 function mockLogin(username) {
     // Create mock player
+    if (typeof GameState === 'undefined') {
+        window.GameState = {
+            player: null,
+            character: null,
+            socket: null,
+            otherPlayers: new Map(),
+            inventory: [],
+            stashes: [],
+            currentQuests: [],
+            team: null
+        };
+    }
+    
     GameState.player = {
-        id: 'mock-player-id',
+        id: 'mock-player-id-' + Date.now(),
         username: username
     };
 

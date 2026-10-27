@@ -1,21 +1,26 @@
 // Supabase Client
-const { createClient } = supabase;
-
-let supabase = null;
+let supabaseClientInstance = null;
 
 function initSupabase() {
-    const supabaseUrl = localStorage.getItem('supabase_url') || CONFIG.SUPABASE_URL;
-    const supabaseKey = localStorage.getItem('supabase_key') || CONFIG.SUPABASE_KEY;
+    try {
+        const supabaseUrl = localStorage.getItem('supabase_url') || CONFIG.SUPABASE_URL;
+        const supabaseKey = localStorage.getItem('supabase_key') || CONFIG.SUPABASE_KEY;
 
-    if (!supabaseUrl || !supabaseKey) {
-        console.error('Supabase credentials not configured');
-        return null;
+        if (!supabaseUrl || !supabaseKey) {
+            console.warn('Supabase credentials not configured');
+            return null;
+        }
+
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+            supabaseClientInstance = window.supabase.createClient(supabaseUrl, supabaseKey);
+            return supabaseClientInstance;
+        }
+    } catch (e) {
+        console.error('Supabase init error:', e);
     }
-
-    supabase = createClient(supabaseUrl, supabaseKey);
-    return supabase;
+    return null;
 }
 
 function getSupabase() {
-    return supabase;
+    return supabaseClientInstance;
 }

@@ -4,9 +4,9 @@ const CONFIG = {
     SERVER_URL: window.location.origin,
     SOCKET_URL: window.location.origin,
 
-    // Supabase (will be loaded from environment)
-    SUPABASE_URL: process.env.SUPABASE_URL || '',
-    SUPABASE_KEY: process.env.SUPABASE_KEY || '',
+    // Supabase (can be set via localStorage for dev)
+    SUPABASE_URL: (typeof window !== 'undefined' && window.SUPABASE_URL) || (localStorage.getItem('supabase_url')) || '',
+    SUPABASE_KEY: (typeof window !== 'undefined' && window.SUPABASE_KEY) || (localStorage.getItem('supabase_key')) || '',
 
     // Game
     WORLD_WIDTH: 10000,
